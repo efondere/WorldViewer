@@ -24,6 +24,8 @@ add_executable(WorldViewer ${WORLD_VIEWER_SOURCE})
 
 target_compile_options(WorldViewer PRIVATE -Wall)
 target_compile_options(WorldViewer PRIVATE -Werror)
+# target_compile_options(WorldViewer PRIVATE -Wextra)
+
 target_compile_features(WorldViewer PRIVATE cxx_std_17)
 
 target_link_libraries(WorldViewer PUBLIC glfw3 glad stb_image)

@@ -9,7 +9,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <fstream>
 #include <iostream>
-#include <bits/c++config.h>
 
 const GLuint WIDTH = 1600, HEIGHT = 900;
 
@@ -37,6 +36,8 @@ int main(int argc, char* argv[])
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    glfwWindowHint(GLFW_SAMPLES, 4);
 
 
     GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "World Viewer", NULL, NULL);
@@ -76,6 +77,8 @@ int main(int argc, char* argv[])
 
     glEnable(GL_FRAMEBUFFER_SRGB); // gamma correction
 
+    glEnable(GL_MULTISAMPLE); // MSAA
+
     Camera cam(window);
 
     Player player(&cam);
@@ -108,6 +111,7 @@ int main(int argc, char* argv[])
 
         glm::mat4 viewProjMatrix = projectionMatrix * cam.getViewMatrix();
         world.setViewProjMatrix(viewProjMatrix);
+        world.setProjMatrix(projectionMatrix);
         player.setViewProjMatrix(viewProjMatrix);
         world.setViewPosition(cam.Position);
 
@@ -116,10 +120,11 @@ int main(int argc, char* argv[])
 
         world.update(elapsedTime);
         player.update(elapsedTime);
-        //sky.draw(); // I should draw it last, but it doesn't work with transparency otherwise
-        //world.draw(&cam, Mesh::RenderMode::ShadedFaces);
+        sky.draw(); // I should draw it last, but it doesn't work with transparency otherwise. I should use another texture slot for it
+        world.draw(&cam, Mesh::RenderMode::ShadedFaces);
         //player.draw();
-        world.draw(&cam, World::RenderMode::Wireframe);
+        world.draw(&cam, World::RenderMode::ShadedWireframe);
+        //world.draw(&cam, World::RenderMode::Wireframe);
 
         glfwSwapBuffers(window);
     }

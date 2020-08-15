@@ -19,8 +19,9 @@ public:
     {
         Wireframe,
         Faces,
-        //ShadedWireframe,
-        ShadedFaces
+        ShadedWireframe,
+        ShadedFaces,
+        Normals
     };
 
     struct Vertex
@@ -69,6 +70,11 @@ public:
     void setViewProjMatrix(const glm::mat4& matrix)
     {
         m_viewProjMatrix = matrix;
+    }
+
+    void setProjMatrix(const glm::mat4& matrix)
+    {
+        m_projMatrix = matrix;
     }
 
     void setViewPosition(const glm::vec3& position)
@@ -130,7 +136,10 @@ protected:
     unsigned int m_defaultShaderProgramID;
     unsigned int m_colorShaderProgramID;
     unsigned int m_wireframeShaderProgramID;
+    unsigned int m_normalDisplayProgramID;
     unsigned int m_colorTextureID;
+    unsigned int m_objTextureID;
+    bool         m_useObjTexture;
 
 private:
 
@@ -142,6 +151,7 @@ private:
     glm::vec3 m_rotation;
     glm::vec3 m_scale;
     glm::mat4 m_viewProjMatrix;
+    glm::mat4 m_projMatrix;
     glm::vec3 m_viewPosition;
     
 };

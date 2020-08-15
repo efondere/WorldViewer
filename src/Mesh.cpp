@@ -8,6 +8,13 @@
 #include <iostream>
 #include <sstream>
 
+struct ObjFace
+{
+    unsigned int vertices[3];
+    unsigned int textureCoords[3];
+    unsigned int normals[3];
+};
+
 std::string getShaderSource(const std::string& filePath)
 {
     std::ifstream inputFile(filePath);
@@ -38,6 +45,8 @@ Mesh::Mesh(const std::string& defaultShaderName, const std::string& colorShaderN
 , m_defaultShaderProgramID(0)
 , m_colorShaderProgramID(0)
 , m_colorTextureID(0)
+, m_objTextureID(0)
+, m_useObjTexture(false)
 , m_position(0.f, 0.f, 0.f)
 , m_rotation(0.f, 0.f, 0.f)
 , m_scale(1.f, 1.f, 1.f)
@@ -45,7 +54,9 @@ Mesh::Mesh(const std::string& defaultShaderName, const std::string& colorShaderN
 {
     m_defaultShaderProgramID = createProgram(defaultShaderName);
     m_colorShaderProgramID = createProgram(colorShaderName);
-    m_wireframeShaderProgramID = createProgramGeom("wireframe");
+    //m_wireframeShaderProgramID = createProgramGeom("wireframe");
+    m_wireframeShaderProgramID = createProgramGeom("solidWireframeTransparent");
+    m_normalDisplayProgramID = createProgramGeom("normalDisplay");
 
     stbi_set_flip_vertically_on_load(1);
 
@@ -91,7 +102,79 @@ Mesh::~Mesh()
 
 void Mesh::loadFromFile(const std::string& filePath)
 {
-    // TODO: Load obj files
+    stbi_set_flip_vertically_on_load(1);
+
+    int imageWidth, imageHeight, imageBytesPerPixel;
+    uint8_t* imageData = stbi_load("./res/textures/cube_texture.png", &imageWidth, &imageHeight, &imageBytesPerPixel, 4);
+    
+    glGenTextures(1, &m_objTextureID);
+    glBindTexture(GL_TEXTURE_2D, m_objTextureID);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, imageWidth, imageHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    if (imageData)
+        stbi_image_free(imageData);
+
+
+    std::ifstream objFile(filePath);
+    if (!objFile.is_open())
+    {
+        std::cout << "Could not open obj file: " << filePath << std::endl;
+        return;
+    }
+
+    std::vector<glm::vec3> vertices;
+    std::vector<glm::vec2> textureCoords;
+    std::vector<glm::vec3> normals;
+    std::vector<ObjFace> faces;
+
+    std::string line;
+    while (std::getline(objFile, line))
+    {
+        std::stringstream lineStream(line);
+        std::string type;
+        lineStream >> type;
+
+        if (type == "#" || type == "")
+            continue;
+
+        if (type == "v")
+        {
+            glm::vec3 vertex;
+            lineStream >> vertex.x >> vertex.y >> vertex.z;
+            vertices.push_back(vertex);
+        }
+        else if (type == "vt")
+        {
+            glm::vec2 textureCoord;
+            lineStream >> textureCoord.x >> textureCoord.y;
+            textureCoords.push_back(textureCoord);
+        }
+        else if (type == "vn")
+        {
+            glm::vec3 normal;
+            lineStream >> normal.x >> normal.y >> normal.z;
+            normals.push_back(normal);
+        }
+        else if (type == "f")
+        {
+            
+        }
+        else
+        {
+            std::cout << "Unkown type: " << type << std::endl;
+            continue;
+        }
+    }
+
+    m_useObjTexture = true;
+    objFile.close();
 }
 
 void Mesh::draw(Camera* camera, RenderMode renderMode) const
@@ -119,7 +202,9 @@ void Mesh::draw(Camera* camera, RenderMode renderMode) const
     if (renderMode == RenderMode::Wireframe)
     {
         glUseProgram(m_wireframeShaderProgramID);
-        glUniformMatrix4fv(glGetUniformLocation(m_wireframeShaderProgramID, "u_MVP"), 1, GL_FALSE, &mvpMatrix[0][0]);
+        //glUniformMatrix4fv(glGetUniformLocation(m_wireframeShaderProgramID, "u_MVP"), 1, GL_FALSE, &mvpMatrix[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(m_wireframeShaderProgramID, "u_viewProjMatrix"), 1, GL_FALSE, &m_viewProjMatrix[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(m_wireframeShaderProgramID, "u_modelMatrix"), 1, GL_FALSE, &modelMatrix[0][0]);
         // Use a for loop and draw the elements with an offset to avoid drawing lines over each other and looping back
         // Also, use GL_LINES
         // We should also cache the uniform locations
@@ -132,24 +217,26 @@ void Mesh::draw(Camera* camera, RenderMode renderMode) const
         glUniformMatrix4fv(glGetUniformLocation(m_defaultShaderProgramID, "u_MVP"), 1, GL_FALSE, &mvpMatrix[0][0]);
         glDrawElements(GL_TRIANGLES, m_faces.size() * 2 * 3, GL_UNSIGNED_INT, nullptr);
     }
-    //else if (renderMode == RenderMode::ShadedWireframe)
-    //{
-    //    glActiveTexture(GL_TEXTURE0);
-    //    glBindTexture(GL_TEXTURE_2D, m_colorTextureID);
-//
-    //    glUseProgram(m_colorShaderProgramID);
-    //    glUniformMatrix4fv(glGetUniformLocation(m_colorShaderProgramID, "u_MVP"), 1, GL_FALSE, &mvpMatrix[0][0]);
-    //    glUniformMatrix4fv(glGetUniformLocation(m_colorShaderProgramID, "u_modelMatrix"), 1, GL_FALSE, &modelMatrix[0][0]);
-    //    glUniformMatrix4fv(glGetUniformLocation(m_colorShaderProgramID, "u_viewMatrix"), 1, GL_FALSE, &camera->getViewMatrix()[0][0]);
-    //    glUniform1i(glGetUniformLocation(m_colorShaderProgramID, "u_texture"), 0);
-    //    glDrawElements(GL_LINE_STRIP, m_faces.size() * 2 * 3, GL_UNSIGNED_INT, nullptr);
-//
-    //    glBindTexture(GL_TEXTURE_2D, 0);
-    //}
+    else if (renderMode == RenderMode::ShadedWireframe)
+    {
+        //glActiveTexture(GL_TEXTURE0);
+        //glBindTexture(GL_TEXTURE_2D, m_colorTextureID);
+
+        glUseProgram(m_defaultShaderProgramID);
+        glUniformMatrix4fv(glGetUniformLocation(m_defaultShaderProgramID, "u_MVP"), 1, GL_FALSE, &mvpMatrix[0][0]);
+        //glUniformMatrix4fv(glGetUniformLocation(m_defaultShaderProgramID, "u_modelMatrix"), 1, GL_FALSE, &modelMatrix[0][0]);
+        //glUniformMatrix4fv(glGetUniformLocation(m_defaultShaderProgramID, "u_viewMatrix"), 1, GL_FALSE, &camera->getViewMatrix()[0][0]);
+        //glUniform1i(glGetUniformLocation(m_defaultShaderProgramID, "u_texture"), 0);
+        glDrawElements(GL_LINE_STRIP, m_faces.size() * 2 * 3, GL_UNSIGNED_INT, nullptr);
+
+    }
     else if (renderMode == RenderMode::ShadedFaces)
     {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_colorTextureID);
+        if (!m_useObjTexture)
+            glBindTexture(GL_TEXTURE_2D, m_colorTextureID);
+        else
+            glBindTexture(GL_TEXTURE_2D, m_objTextureID);
 
         float lightColor[3] = { 1.f, 1.f, 1.f };
         glm::vec3 lightPosition(10.f, 250.f, 0.f);
@@ -167,6 +254,15 @@ void Mesh::draw(Camera* camera, RenderMode renderMode) const
         glDrawElements(GL_TRIANGLES, m_faces.size() * 2 * 3, GL_UNSIGNED_INT, nullptr);
 
         glBindTexture(GL_TEXTURE_2D, 0);
+    }
+    else if (renderMode == RenderMode::Normals)
+    {
+        glUseProgram(m_normalDisplayProgramID);
+        glUniformMatrix4fv(glGetUniformLocation(m_normalDisplayProgramID, "u_viewMatrix"), 1, GL_FALSE, &camera->getViewMatrix()[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(m_normalDisplayProgramID, "u_modelMatrix"), 1, GL_FALSE, &modelMatrix[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(m_normalDisplayProgramID, "u_projMatrix"), 1, GL_FALSE, &m_projMatrix[0][0]);
+
+        glDrawElements(GL_TRIANGLES, m_faces.size() * 2 * 3, GL_UNSIGNED_INT, nullptr);
     }
 }
 
